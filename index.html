@@ -42,10 +42,43 @@
             cursor: pointer;
             border-radius: 4px;
             font-weight: bold;
+            margin-bottom: 15px;
         }
         .btn-print:hover {
             background-color: #005fa3;
         }
+
+        /* 担当者管理エリア */
+        .profile-manager {
+            background: #ffffff;
+            padding: 10px 20px;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: inline-block;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+        }
+        .profile-manager select {
+            padding: 6px;
+            font-size: 14px;
+            margin-right: 15px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .btn-save { background: #28a745; }
+        .btn-save:hover { background: #218838; }
+        .btn-delete { background: #dc3545; }
+        .btn-delete:hover { background: #c82333; }
 
         /* A4サイズの設定（絶対に1枚に収める設定） */
         .page {
@@ -268,6 +301,17 @@
     <div class="no-print">
         <button class="btn-print" onclick="window.print()">🖨️ 印刷 / PDFとして保存</button>
         <p>※必要項目と金額を入力し、上のボタンを押してください。</p>
+        
+        <!-- 担当者登録・呼び出し機能エリア -->
+        <div class="profile-manager">
+            <span style="font-weight: bold; color: var(--primary-color);">👤 担当者呼出：</span>
+            <select id="profileSelect" onchange="loadProfile()">
+                <option value="">-- 担当者を選択 --</option>
+            </select>
+            <button class="btn-sm btn-save" onclick="saveProfile()">💾 現在の内容を登録/更新</button>
+            <button class="btn-sm btn-delete" onclick="deleteProfile()">🗑️ 削除</button>
+            <div style="font-size: 11px; color: #666; margin-top: 5px;">※入力した名前と電話番号をお使いのブラウザに記憶させます。</div>
+        </div>
     </div>
 
     <div class="page">
@@ -301,8 +345,8 @@
                     <p>〒732-0827</p>
                     <p>広島県広島市南区稲荷町2-14</p>
                     <p>和光稲荷町ビル8階</p>
-                    <p style="display: flex; align-items: center;">TEL:&nbsp;<input type="text" class="input-transparent" placeholder="電話番号" style="width: 120px; text-align: left;"></p>
-                    <p style="display: flex; align-items: center;">担当:&nbsp;<input type="text" class="input-transparent" placeholder="担当者名" style="width: 120px; text-align: left;"></p>
+                    <p style="display: flex; align-items: center;">TEL:&nbsp;<input type="text" class="input-transparent" id="picTel" placeholder="電話番号" style="width: 120px; text-align: left;"></p>
+                    <p style="display: flex; align-items: center;">担当:&nbsp;<input type="text" class="input-transparent" id="picName" placeholder="担当者名" style="width: 120px; text-align: left;"></p>
                 </div>
             </div>
         </div>
@@ -360,6 +404,71 @@
 
     <script>
         document.getElementById('currentDate').valueAsDate = new Date();
+
+        // ----------------------------------------------------
+        // 担当者保存・呼び出し機能 (localStorageを使用)
+        // ----------------------------------------------------
+        const STORAGE_KEY = 'albalink_estimate_profiles';
+        let profiles = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+
+        function updateProfileSelect() {
+            const select = document.getElementById('profileSelect');
+            select.innerHTML = '<option value="">-- 担当者を選択 --</option>';
+            for (const name in profiles) {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                select.appendChild(opt);
+            }
+        }
+
+        function loadProfile() {
+            const name = document.getElementById('profileSelect').value;
+            if (name && profiles[name]) {
+                document.getElementById('picName').value = name;
+                document.getElementById('picTel').value = profiles[name].tel || '';
+            } else {
+                document.getElementById('picName').value = '';
+                document.getElementById('picTel').value = '';
+            }
+        }
+
+        function saveProfile() {
+            const name = document.getElementById('picName').value.trim();
+            const tel = document.getElementById('picTel').value.trim();
+            
+            if (!name) {
+                alert('担当者名を入力してください。');
+                return;
+            }
+            
+            profiles[name] = { tel: tel };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+            
+            updateProfileSelect();
+            document.getElementById('profileSelect').value = name;
+            alert(`担当者「${name}」の情報を登録しました。次回から選択できます。`);
+        }
+
+        function deleteProfile() {
+            const name = document.getElementById('profileSelect').value;
+            if (!name) {
+                alert('削除する担当者をリストから選択してください。');
+                return;
+            }
+            
+            if (confirm(`担当者「${name}」の登録を削除してもよろしいですか？`)) {
+                delete profiles[name];
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+                updateProfileSelect();
+                document.getElementById('picName').value = '';
+                document.getElementById('picTel').value = '';
+                alert('削除しました。');
+            }
+        }
+
+        updateProfileSelect();
+        // ----------------------------------------------------
 
         function calculateTotal() {
             const inputs = document.querySelectorAll('.amount-input');
