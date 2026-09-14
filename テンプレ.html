@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="favicon.png" type="image/png">
+    <title>販売見積書作成Tool</title>
+    <style>
+        /* 印刷時に背景色を強制的に出力させる設定 */
+        * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        /* 全体のベーススタイル */
+        :root {
+            --primary-color: #0077c8;
+            --text-color: #333333;
+            --border-color: #aaaaaa;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            color: var(--text-color);
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            font-size: 14px;
+        }
+
+        /* 印刷メニュー */
+        .no-print {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .btn-print {
+            background-color: var(--primary-color);
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .btn-print:hover {
+            background-color: #005fa3;
+        }
+
+        /* A4サイズの設定（絶対に1枚に収める設定） */
+        .page {
+            width: 210mm;
+            height: 296mm; /* A4サイズ（297mm）に完全固定し、余分な白紙印刷を防ぐ */
+            background: white;
+            margin: 0 auto;
+            padding: 25mm 20mm;
+            box-sizing: border-box;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden; /* 万が一A4サイズを超えようとした場合、はみ出しを強制カットして2枚目を防ぐ */
+        }
+
+        /* ヘッダー */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 40px;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 30px;
+        }
+        .header-left {
+            width: 55%;
+        }
+        .header-right {
+            width: 45%;
+            text-align: right;
+        }
+
+        .company-info-inner {
+            display: inline-block;
+            text-align: left;
+            margin-top: 10px;
+        }
+
+        .title {
+            font-size: 26px;
+            color: var(--primary-color);
+            margin: 0 0 35px 0;
+            letter-spacing: 2px;
+        }
+
+        .logo {
+            max-width: 180px;
+            max-height: 70px;
+            height: auto;
+            object-fit: contain;
+        }
+
+        .input-transparent {
+            border: none;
+            border-bottom: 1px dashed #ccc;
+            background: transparent;
+            font-size: inherit;
+            font-family: inherit;
+            color: inherit;
+            width: 100%;
+            padding: 4px 2px;
+            box-sizing: border-box;
+        }
+        .input-transparent:focus {
+            outline: none;
+            border-bottom: 1px solid var(--primary-color);
+            background-color: #f0f8ff;
+        }
+
+        .client-info {
+            display: flex;
+            align-items: flex-end;
+            margin-bottom: 25px;
+        }
+        .client-info input {
+            font-size: 22px;
+            font-weight: bold;
+            width: 200px;
+            margin-right: 10px;
+        }
+        .client-info span {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .company-info p {
+            margin: 4px 0;
+            line-height: 1.4;
+        }
+
+        /* 見積金額合計（改行されない） */
+        .total-amount-box {
+            display: inline-flex;
+            min-width: 80%;
+            align-items: baseline;
+            border-bottom: 3px solid var(--primary-color);
+            margin-bottom: 40px;
+            padding-bottom: 10px;
+            white-space: nowrap;
+        }
+        .total-amount-box span.label {
+            font-size: 16px;
+            margin-right: 20px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .total-amount-box span.amount {
+            font-size: 30px;
+            font-weight: bold;
+            color: var(--primary-color);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        /* テーブル */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 40px;
+        }
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 12px 10px;
+            vertical-align: middle;
+        }
+        th {
+            background-color: var(--primary-color);
+            color: white;
+            text-align: center;
+            font-weight: normal;
+        }
+        td.amount-col {
+            text-align: right;
+            width: 140px;
+        }
+        td.action-col {
+            text-align: center;
+            width: 50px;
+        }
+        
+        .amount-input {
+            width: 100%;
+            text-align: right;
+            border: 1px solid #ccc;
+            padding: 8px 4px;
+            box-sizing: border-box;
+            font-size: 15px;
+        }
+
+        .btn-add, .btn-remove {
+            cursor: pointer;
+            padding: 6px 10px;
+            font-size: 12px;
+        }
+        .btn-add {
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 3px;
+        }
+        .btn-remove {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 3px;
+        }
+
+        /* 備考欄 */
+        .remarks-box {
+            border: 1px solid var(--border-color);
+            padding: 20px;
+        }
+        .remarks-title {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+        textarea.remarks {
+            width: 100%;
+            min-height: 100px; /* 初期の高さ */
+            max-height: 260px; /* A4をはみ出さない最大の高さストッパー */
+            border: none;
+            resize: none;
+            font-family: inherit;
+            line-height: 1.6;
+            overflow: hidden !important; /* スクロールバーを「絶対に」表示させない */
+            box-sizing: border-box;
+        }
+
+        /* 印刷時のスタイル */
+        @media print {
+            body {
+                background: none;
+                padding: 0;
+            }
+            .page {
+                box-shadow: none;
+                width: 210mm;
+                height: 296mm; /* 印刷時もA4固定 */
+                margin: 0;
+                padding: 25mm 20mm;
+                overflow: hidden;
+                page-break-after: avoid; /* 次のページへの不要な改ページを防ぐ */
+            }
+            .no-print, .action-col {
+                display: none !important;
+            }
+            .input-transparent, .amount-input {
+                border: none !important;
+                background: transparent !important;
+                padding: 0;
+            }
+            textarea.remarks {
+                border: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="no-print">
+        <button class="btn-print" onclick="window.print()">🖨️ 印刷 / PDFとして保存</button>
+        <p>※必要項目と金額を入力し、上のボタンを押してください。</p>
+    </div>
+
+    <div class="page">
+        <!-- ヘッダー -->
+        <div class="header">
+            <div class="header-left">
+                <h1 class="title">物件購入見積書</h1>
+                
+                <div class="client-info">
+                    <input type="text" class="input-transparent" placeholder="お客様名">
+                    <span>様</span>
+                </div>
+                
+                <p style="margin-bottom: 20px;">下記の通り、御見積申し上げます。</p>
+                
+                <div>
+                    <span style="font-size: 12px;">物件名・所在地：</span><br>
+                    <input type="text" class="input-transparent" placeholder="例：東京都◯◯区◯◯ 1-2-3">
+                </div>
+            </div>
+            
+            <div class="header-right company-info">
+                <!-- ロゴ画像 -->
+                <img src="images.jpeg" alt="AlbaLink Logo" class="logo"><br>
+                
+                <div class="company-info-inner">
+                    <div style="text-align: right; margin-bottom: 8px;">
+                        <input type="date" class="input-transparent" style="width: auto; text-align: right; font-size: 13px;" id="currentDate">
+                    </div>
+                    <p style="font-weight: bold; font-size: 15px;">株式会社AlbaLink</p>
+                    <p>〒732-0827</p>
+                    <p>広島県広島市南区稲荷町2-14</p>
+                    <p>和光稲荷町ビル8階</p>
+                    <p style="display: flex; align-items: center;">TEL:&nbsp;<input type="text" class="input-transparent" placeholder="電話番号" style="width: 120px; text-align: left;"></p>
+                    <p style="display: flex; align-items: center;">担当:&nbsp;<input type="text" class="input-transparent" placeholder="担当者名" style="width: 120px; text-align: left;"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 合計金額 -->
+        <div class="total-amount-box">
+            <span class="label">御見積金額合計（税込）</span>
+            <span class="amount" id="totalAmountDisplay">¥0 -</span>
+        </div>
+
+        <!-- 見積明細 -->
+        <table id="estimateTable">
+            <thead>
+                <tr>
+                    <th>項目</th>
+                    <th>摘要・詳細</th>
+                    <th>金額 (円)</th>
+                    <th class="action-col">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><input type="text" class="input-transparent" value="売買代金"></td>
+                    <td><input type="text" class="input-transparent" placeholder="物件価格"></td>
+                    <td class="amount-col"><input type="number" class="amount-input" value="0" oninput="calculateTotal()"></td>
+                    <td class="action-col"></td>
+                </tr>
+                <tr>
+                    <td><input type="text" class="input-transparent" value="移転登記費用"></td>
+                    <td><input type="text" class="input-transparent" placeholder="登録免許税・司法書士報酬等"></td>
+                    <td class="amount-col"><input type="number" class="amount-input" value="0" oninput="calculateTotal()"></td>
+                    <td class="action-col"></td>
+                </tr>
+                <tr>
+                    <td><input type="text" class="input-transparent" value="固定資産税精算金"></td>
+                    <td><input type="text" class="input-transparent" placeholder="引渡し日以降の精算"></td>
+                    <td class="amount-col"><input type="number" class="amount-input" value="0" oninput="calculateTotal()"></td>
+                    <td class="action-col"></td>
+                </tr>
+                <!-- 追加用の行 -->
+                <tr id="addRowTemplate" class="no-print">
+                    <td colspan="4" style="text-align: center; background: #f9f9f9; border: 1px dashed #ccc;">
+                        <button class="btn-add" onclick="addRow()">+ 項目を追加する</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- 備考欄 -->
+        <div class="remarks-box">
+            <div class="remarks-title">備考・特記事項</div>
+            <textarea class="remarks" oninput="autoResize(this)" placeholder="有効期限：発行日より◯日間&#13;&#10;その他特記事項を入力してください。"></textarea>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('currentDate').valueAsDate = new Date();
+
+        function calculateTotal() {
+            const inputs = document.querySelectorAll('.amount-input');
+            let total = 0;
+            inputs.forEach(input => {
+                const val = parseInt(input.value, 10);
+                if (!isNaN(val)) {
+                    total += val;
+                }
+            });
+            document.getElementById('totalAmountDisplay').innerText = '¥' + total.toLocaleString() + ' -';
+        }
+
+        function addRow() {
+            const template = document.getElementById('addRowTemplate');
+            const newRow = document.createElement('tr');
+            newRow.innerHTML = `
+                <td><input type="text" class="input-transparent" placeholder="項目名"></td>
+                <td><input type="text" class="input-transparent" placeholder="摘要・詳細"></td>
+                <td class="amount-col"><input type="number" class="amount-input" value="0" oninput="calculateTotal()"></td>
+                <td class="action-col"><button class="btn-remove" onclick="removeRow(this)">削除</button></td>
+            `;
+            template.parentNode.insertBefore(newRow, template);
+        }
+
+        function removeRow(btn) {
+            const row = btn.closest('tr');
+            row.remove();
+            calculateTotal();
+        }
+
+        // 備考欄の自動リサイズ（スクロールバー排除版）
+        function autoResize(el) {
+            // 一旦高さを小さくリセットすることで、文字を消した時にも枠が縮むようにする
+            el.style.height = '100px'; 
+            // 実際の文字の高さ（scrollHeight）に合わせて枠を広げる
+            el.style.height = el.scrollHeight + 'px';
+        }
+
+        // 読み込み時に初期化
+        calculateTotal();
+        
+        // ページ読み込み時にも一度リサイズ判定をかける
+        window.addEventListener('DOMContentLoaded', () => {
+            const remarksTextarea = document.querySelector('.remarks');
+            if(remarksTextarea) {
+                autoResize(remarksTextarea);
+            }
+        });
+    </script>
+
+</body>
+</html>
